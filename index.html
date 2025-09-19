@@ -1,0 +1,756 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <title>مُولد — المولد الفلكي</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+    }
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #121212;
+      color: #e0e0e0;
+      display: grid;
+      grid-template-columns: 280px 1fr 280px;
+      grid-template-rows: auto 1fr auto;
+      min-height: 100vh;
+      gap: 1px;
+    }
+    header {
+      grid-column: 1 / -1;
+      background: #1e1e1e;
+      padding: 15px;
+      text-align: center;
+      border-bottom: 1px solid #444;
+    }
+    #sidebar-left, #main, #sidebar-right {
+      padding: 15px;
+      overflow-y: auto;
+    }
+    #sidebar-left {
+      background: #1e1e1e;
+    }
+    #main {
+      background: #16213e;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+    #sidebar-right {
+      background: #222;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+    .drop-zone {
+      border: 3px dashed #0077b6;
+      border-radius: 12px;
+      padding: 20px;
+      text-align: center;
+      margin: 10px 0;
+      background: #1a1a2e;
+      color: #00b4d8;
+    }
+    .drop-zone.highlight { border-color: #00b4d8; background: #0d2b3e; }
+    .input-group {
+      margin: 12px 0;
+      font-size: 15px;
+    }
+    label {
+      display: block;
+      text-align: right;
+      margin-bottom: 6px;
+    }
+    input, select, button {
+      width: 100%;
+      padding: 8px;
+      border-radius: 6px;
+      border: 1px solid #555;
+      background: #333;
+      color: #fff;
+    }
+    small.hint {
+      display: block;
+      color: #aaa;
+      font-size: 12px;
+      margin-top: 4px;
+    }
+    button {
+      background: #0077b6;
+      color: white;
+      font-weight: bold;
+      cursor: pointer;
+      margin: 8px 0;
+    }
+    button:hover { background: #005f86; }
+    .btn-print { background: #00b4d8; }
+    .btn-save { background: #90e0ef; color: #003060; }
+    .btn-lang { background: #555; }
+    .info-panel {
+      margin: 15px 0;
+      padding: 12px;
+      background: #2a2a2a;
+      border-radius: 8px;
+      font-size: 13px;
+    }
+    .legend-item {
+      margin: 4px 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .symbol {
+      font-size: 18px;
+      width: 24px;
+      text-align: center;
+    }
+    .aspect-line {
+      height: 12px;
+      margin: 2px 0;
+      border-radius: 3px;
+    }
+    canvas {
+      margin: 10px;
+      background: #1a1a2e;
+      border: 1px solid #0077b6;
+      border-radius: 50%;
+      max-height: 90vh;
+      height: 90vh;
+      width: auto;
+    }
+    .tooltip {
+      position: absolute;
+      background: rgba(0, 0, 0, 0.8);
+      color: #fff;
+      padding: 8px;
+      border-radius: 6px;
+      font-size: 14px;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.3s;
+      z-index: 10;
+      transform: translate(-50%, -100%);
+    }
+    .footer {
+      grid-column: 1 / -1;
+      background: #1e1e1e;
+      padding: 10px;
+      text-align: center;
+      font-size: 12px;
+      color: #888;
+    }
+
+    /* جدول الكواكب والأبراج في عمودين */
+    .legend-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .legend-col {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .legend-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .legend-row .symbol {
+      font-size: 16px;
+      width: 20px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1 id="title">مُولد — المولد الفلكي</h1>
+  </header>
+
+  <!-- الشريط الأيسر: التحكم -->
+  <div id="sidebar-left">
+    <div class="input-group">
+      <label id="lblDate">التاريخ:</label>
+      <input type="date" id="birthDate" />
+      <small class="hint">مثلاً: 1969-02-20</small>
+    </div>
+
+    <div class="input-group">
+      <label id="lblTime">الوقت (24 ساعة):</label>
+      <input type="time" id="birthTime" step="1" />
+      <small class="hint">مثلاً: 06:30 صباحًا، 18:45 مساءً</small>
+    </div>
+
+    <div class="input-group">
+      <label id="lblLat">خط العرض:</label>
+      <input type="number" id="latitude" step="0.0001" placeholder="30.0444" value="30.0444" />
+    </div>
+
+    <div class="input-group">
+      <label id="lblLon">خط الطول:</label>
+      <input type="number" id="longitude" step="0.0001" placeholder="31.2357" value="31.2357" />
+    </div>
+
+    <div class="input-group">
+      <label id="lblHouse">نظام البيوت:</label>
+      <select id="houseSystem">
+        <option value="placidus">بلاسيدوس</option>
+        <option value="equal">متساوية</option>
+      </select>
+    </div>
+
+    <button id="btnGen"     onclick="generateChart()">إنشاء المخطط</button>
+    <button id="btnPrint"   class="btn-print" onclick="printReport()">🖨️ طباعة التقرير</button>
+    <button id="btnSave"    class="btn-save" onclick="saveReport('txt')">💾 حفظ كنص</button>
+    <button id="btnSavePdf" class="btn-save" onclick="saveReport('pdf')">📄 حفظ كـ PDF</button>
+    <button id="btnLang"    class="btn-lang" onclick="toggleLang()">EN</button>
+
+    <h3>السحب والإفلات</h3>
+    <div id="dropZone" class="drop-zone">
+      <p>اسحب ملف الميلاد هنا</p>
+      <small>يدعم: .txt, .json</small>
+    </div>
+
+    <div class="info-panel" id="infoPanel">
+      LST: --° | الصاعد: --° | MC: --°
+    </div>
+
+    <h3>الكواكب:</h3>
+    <div id="planetsLegend"></div>
+  </div>
+
+  <!-- الوسط: المخطط -->
+  <div id="main">
+    <canvas id="horoscope" width="600" height="600"></canvas>
+    <div id="tooltip" class="tooltip">بيت 1</div>
+  </div>
+
+  <!-- الشريط الأيمن: التحليل والدليل -->
+  <div id="sidebar-right">
+    <h2 id="analysisTitle">التحليل الفلكي</h2>
+    <div id="analysisContent">
+      <p>اضغط "إنشاء المخطط" لعرض التحليل.</p>
+    </div>
+
+    <h3>الدليل: الكواكب والأبراج</h3>
+    <div class="legend-grid">
+      <div class="legend-col" id="planetsGuide"></div>
+      <div class="legend-col" id="signsGuide"></div>
+    </div>
+
+    <h3>الجوانب الرئيسية</h3>
+    <div>
+      <div class="aspect-line" style="background: gold;"></div><small>اقتران (0°)</small><br>
+      <div class="aspect-line" style="background: green;"></div><small>سداسي (60°)</small><br>
+      <div class="aspect-line" style="background: blue;"></div><small>تثليث (120°)</small><br>
+      <div class="aspect-line" style="background: red;"></div><small>تربيع (90°)</small><br>
+      <div class="aspect-line" style="background: purple;"></div><small>تقابل (180°)</small>
+    </div>
+
+    <h3>الرموز</h3>
+    <div>
+      <p><strong>↑</strong>: الصاعد (Ascendant) - بداية البيت الأول</p>
+      <p><strong>⊕</strong>: القمة العلوية (MC) - بداية البيت 10</p>
+    </div>
+  </div>
+
+  <div class="footer">
+    مولد فلكي دقيق — بدون مكتبات — نظام 24 ساعة
+  </div>
+
+  <script>
+    const canvas = document.getElementById('horoscope');
+    const ctx = canvas.getContext('2d');
+    const cx = canvas.width / 2;
+    const cy = canvas.height / 2;
+    const radius = 200;
+
+    const tooltip = document.getElementById('tooltip');
+
+    let currentLang = 'ar';
+    let houses = [];
+    let asc = 0;
+    let mc = 0;
+    let zodiacStarts = [];
+
+    const lang = {
+      ar: {
+        title: 'مُولد — المولد الفلكي',
+        date: 'التاريخ:',
+        time: 'الوقت (24 ساعة):',
+        lat: 'خط العرض:',
+        lon: 'خط الطول:',
+        house: 'نظام البيوت:',
+        btnGen: 'إنشاء المخطط',
+        btnPrint: '🖨️ طباعة التقرير',
+        btnSave: '💾 حفظ كنص',
+        btnSavePdf: '📄 حفظ كـ PDF',
+        btnLang: 'EN',
+        info: 'LST: {lst}° | الصاعد: {asc}° | MC: {mc}°',
+        analysis: 'التحليل الفلكي',
+        planetIn: 'في',
+        house: 'البيت',
+        aspects: 'جوانب',
+        noAspects: 'لا توجد جوانب قوية',
+        planet: 'الكوكب',
+        sign: 'البرج',
+        start: 'بداية',
+        end: 'نهاية'
+      },
+      en: {
+        title: 'Mawled — Horoscope App',
+        date: 'Date:',
+        time: 'Time (24h):',
+        lat: 'Latitude:',
+        lon: 'Longitude:',
+        house: 'House System:',
+        btnGen: 'Generate Chart',
+        btnPrint: '🖨️ Print Report',
+        btnSave: '💾 Save as Text',
+        btnSavePdf: '📄 Save as PDF',
+        btnLang: 'AR',
+        info: 'LST: {lst}° | Asc: {asc}° | MC: {mc}°',
+        analysis: 'Astrological Analysis',
+        planetIn: 'in',
+        house: 'House',
+        aspects: 'Aspects',
+        noAspects: 'No strong aspects',
+        planet: 'Planet',
+        sign: 'Sign',
+        start: 'Start',
+        end: 'End'
+      }
+    };
+
+    function _(id) { return document.getElementById(id); }
+    function t(key) { return lang[currentLang][key]; }
+
+    function toggleLang() {
+      currentLang = currentLang === 'ar' ? 'en' : 'ar';
+      document.documentElement.dir = currentLang === 'ar' ? 'rtl' : 'ltr';
+      updateLabels();
+      generateChart();
+    }
+
+    function updateLabels() {
+      _('title').textContent = t('title');
+      _('lblDate').textContent = t('date');
+      _('lblTime').textContent = t('time');
+      _('lblLat').textContent = t('lat');
+      _('lblLon').textContent = t('lon');
+      _('lblHouse').textContent = t('house');
+      _('btnGen').textContent = t('btnGen');
+      _('btnPrint').textContent = t('btnPrint');
+      _('btnSave').textContent = t('btnSave');
+      _('btnSavePdf').textContent = t('btnSavePdf');
+      _('btnLang').textContent = t('btnLang');
+      _('analysisTitle').textContent = t('analysis');
+    }
+
+    // --- السحب والإفلات ---
+    const dropZone = _('dropZone');
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(e => {
+      dropZone.addEventListener(e, e => { e.preventDefault(); e.stopPropagation(); }, false);
+    });
+    dropZone.addEventListener('dragenter', () => dropZone.classList.add('highlight'), false);
+    dropZone.addEventListener('dragover', () => dropZone.classList.add('highlight'), false);
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('highlight'), false);
+    dropZone.addEventListener('drop', handleDrop, false);
+
+    function handleDrop(e) {
+      const files = e.dataTransfer.files;
+      if (files.length > 0) {
+        const file = files[0];
+        const reader = new FileReader();
+        reader.onload = function (e) {
+          try {
+            if (file.name.endsWith('.json')) {
+              const data = JSON.parse(e.target.result);
+              if (data.date) _('birthDate').value = data.date;
+              if (data.time) _('birthTime').value = data.time;
+              if (data.latitude) _('latitude').value = data.latitude;
+              if (data.longitude) _('longitude').value = data.longitude;
+            } else if (file.name.endsWith('.txt')) {
+              const lines = e.target.result.split('\n');
+              const data = {};
+              lines.forEach(line => {
+                const [k, v] = line.split(':');
+                if (k && v) data[k.trim()] = v.trim();
+              });
+              if (data.date) _('birthDate').value = data.date;
+              if (data.time) _('birthTime').value = data.time;
+              if (data.latitude) _('latitude').value = data.latitude;
+              if (data.longitude) _('longitude').value = data.longitude;
+            }
+            generateChart();
+          } catch (err) {
+            alert('خطأ في قراءة الملف');
+          }
+        };
+        reader.readAsText(file);
+      }
+    }
+
+    // --- الحسابات الفلكية ---
+    function degToRad(d) { return d * Math.PI / 180; }
+    function radToDeg(r) { return r * 180 / Math.PI; }
+    function mod(n, m) { return ((n % m) + m) % m; }
+
+    function julianDay(date) {
+      const y = date.getFullYear();
+      const m = date.getMonth() + 1;
+      const d = date.getDate();
+      const h = date.getHours() + date.getMinutes() / 60 + date.getSeconds() / 3600;
+      const a = Math.floor((14 - m) / 12);
+      const yAdj = y + 4800 - a;
+      const mAdj = m + 12 * a - 3;
+      let jd = d + Math.floor((153 * mAdj + 2) / 5) + 365 * yAdj +
+               Math.floor(yAdj / 4) - Math.floor(yAdj / 100) +
+               Math.floor(yAdj / 400) - 32045;
+      return jd + (h / 24) - 0.5;
+    }
+
+    function gmst(jd) {
+      const D = jd - 2451545.0;
+      let gmst = 18.697374558 + 24.06570982441908 * D;
+      gmst = gmst % 24;
+      if (gmst < 0) gmst += 24;
+      return gmst * 15;
+    }
+
+    function localSiderealTime(jd, lon) {
+      return mod(gmst(jd) + lon, 360);
+    }
+
+    function calculateAscendant(lst, lat) {
+      const ecl = 23.44;
+      const A = -Math.sin(degToRad(lst));
+      const B = Math.cos(degToRad(lst)) * Math.sin(degToRad(lat)) + Math.tan(degToRad(ecl)) * Math.cos(degToRad(lat));
+      let asc = radToDeg(Math.atan2(A, B));
+      return mod(asc, 360);
+    }
+
+    function calculateMC(lst) {
+      const ecl = 23.44;
+      const mc = radToDeg(Math.atan(Math.sin(degToRad(lst)) / Math.tan(degToRad(ecl))));
+      return mod(mc, 360);
+    }
+
+    function equalHouses(asc) {
+      return Array.from({ length: 12 }, (_, i) => mod(asc + i * 30, 360));
+    }
+
+    // --- الكواكب والأبراج ---
+    const planets = [
+      { name: 'شمس', symbol: '☉', color: 'yellow', eng: 'Sun' },
+      { name: 'قمر', symbol: '☽', color: 'white', eng: 'Moon' },
+      { name: 'عطارد', symbol: '☿', color: '#ccc', eng: 'Mercury' },
+      { name: 'الزهرة', symbol: '♀', color: 'pink', eng: 'Venus' },
+      { name: 'المريخ', symbol: '♂', color: 'red', eng: 'Mars' },
+      { name: 'المشتري', symbol: '♃', color: '#ffa500', eng: 'Jupiter' },
+      { name: 'زحل', symbol: '♄', color: '#daa520', eng: 'Saturn' },
+      { name: 'أورانوس', symbol: '♅', color: '#00ffff', eng: 'Uranus' },
+      { name: 'نبتون', symbol: '♆', color: '#1e90ff', eng: 'Neptune' },
+      { name: 'بلوتو', symbol: '♇', color: '#b8860b', eng: 'Pluto' }
+    ];
+
+    const zodiac = [
+      { name: 'حمل', symbol: '♈', color: '#ff6b35' },
+      { name: 'ثور', symbol: '♉', color: '#8bc34a' },
+      { name: 'جوزاء', symbol: '♊', color: '#00b4d8' },
+      { name: 'سرطان', symbol: '♋', color: '#0077b6' },
+      { name: 'أسد', symbol: '♌', color: '#ff9800' },
+      { name: 'عذراء', symbol: '♍', color: '#9c27b0' },
+      { name: 'ميزان', symbol: '♎', color: '#3f51b5' },
+      { name: 'عقرب', symbol: '♏', color: '#f44336' },
+      { name: 'قوس', symbol: '♐', color: '#795548' },
+      { name: 'جدي', symbol: '♑', color: '#607d8b' },
+      { name: 'دلو', symbol: '♒', color: '#2196f3' },
+      { name: 'حوت', symbol: '♓', color: '#e91e63' }
+    ];
+
+    function planetLong(name, jd) {
+      const n = jd - 2451545.0;
+      const orbits = {
+        Sun: mod(280.466 + 0.9856474 * n, 360),
+        Moon: mod(218.316 + 13.176396 * n, 360),
+        Mercury: mod(252.2 + 4.092334 * n, 360),
+        Venus: mod(181.98 + 1.602130 * n, 360),
+        Mars: mod(355.45 + 0.524021 * n, 360),
+        Jupiter: mod(34.35 + 0.083085 * n, 360),
+        Saturn: mod(50.08 + 0.033444 * n, 360),
+        Uranus: mod(313.5 + 0.011725 * n, 360),
+        Neptune: mod(304.3 + 0.00598 * n, 360),
+        Pluto: mod(238.95 + 0.00396 * n, 360)
+      };
+      return orbits[name] || 0;
+    }
+
+    // --- الرسم ---
+    function drawCircle(x, y, r, color, fill = false) {
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, 2 * Math.PI);
+      ctx.strokeStyle = color;
+      if (fill) ctx.fillStyle = color;
+      ctx.stroke();
+      if (fill) ctx.fill();
+    }
+
+    function writeText(text, x, y, color = 'white', size = 16, font = 'Arial') {
+      ctx.font = `${size}px '${font}', sans-serif`;
+      ctx.fillStyle = color;
+      ctx.textAlign = 'center';
+      ctx.fillText(text, x, y);
+    }
+
+    function drawChart(asc, mc, longitudes, houses) {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.translate(0.5, 0.5);
+
+      // الدائرة الداخلية
+      drawCircle(cx, cy, radius, '#0077b6');
+
+      // حفظ بيانات البيوت
+      window.housesData = houses.map((start, i) => {
+        const end = houses[(i + 1) % 12];
+        const signIndex = Math.floor(start / 30);
+        const sign = zodiac[signIndex];
+        return { num: i + 1, start, end, sign: sign.name, symbol: sign.symbol };
+      });
+
+      // رسم خطوط البيوت
+      for (let i = 0; i < 12; i++) {
+        const angle = degToRad(houses[i]) - Math.PI / 2;
+        const x1 = cx + Math.cos(angle) * radius;
+        const y1 = cy + Math.sin(angle) * radius;
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.lineTo(x1, y1);
+        ctx.strokeStyle = '#005f86';
+        ctx.stroke();
+      }
+
+      // رموز الكواكب داخل الدائرة
+      planets.forEach((p, i) => {
+        const angle = degToRad(longitudes[i]) - Math.PI / 2;
+        const x = cx + Math.cos(angle) * radius;
+        const y = cy + Math.sin(angle) * radius;
+        drawCircle(x, y, 7, '#222', true);
+        writeText(p.symbol, x, y + 5, p.color, 16, 'Segoe UI Symbol');
+      });
+
+      // أسماء الكواكب
+      planets.forEach((p, i) => {
+        const angle = degToRad(longitudes[i]) - Math.PI / 2;
+        const x = cx + Math.cos(angle) * (radius + 30);
+        const y = cy + Math.sin(angle) * (radius + 30);
+        writeText(p.name, x, y, p.color, 14);
+      });
+
+      // رموز الأبراج
+      for (let i = 0; i < 12; i++) {
+        const deg = i * 30 + 15;
+        const angle = degToRad(deg) - Math.PI / 2;
+        const x = cx + Math.cos(angle) * (radius + 50);
+        const y = cy + Math.sin(angle) * (radius + 50);
+        const sign = zodiac[i];
+        writeText(sign.symbol, x, y, sign.color, 24, 'Segoe UI Symbol');
+      }
+
+      // أسماء الأبراج
+      for (let i = 0; i < 12; i++) {
+        const deg = i * 30 + 15;
+        const angle = degToRad(deg) - Math.PI / 2;
+        const x = cx + Math.cos(angle) * (radius + 70);
+        const y = cy + Math.sin(angle) * (radius + 70);
+        const sign = zodiac[i];
+        writeText(sign.name, x, y, sign.color, 16);
+      }
+
+      // الصاعد وMC
+      const ascAngle = degToRad(asc) - Math.PI / 2;
+      const mcAngle = degToRad(mc) - Math.PI / 2;
+      writeText('↑', cx + Math.cos(ascAngle) * (radius + 20), cy + Math.sin(ascAngle) * (radius + 20), 'gold', 20);
+      writeText('⊕', cx + Math.cos(mcAngle) * (radius + 20), cy + Math.sin(mcAngle) * (radius + 20), 'silver', 20);
+
+      // رسم الجوانب
+      const aspects = [
+        { name: 'اقتران', angle: 0, orb: 8, color: 'gold' },
+        { name: 'سداسي', angle: 60, orb: 6, color: 'green' },
+        { name: 'تثليث', angle: 120, orb: 8, color: 'blue' },
+        { name: 'تربيع', angle: 90, orb: 8, color: 'red' },
+        { name: 'تقابل', angle: 180, orb: 10, color: 'purple' }
+      ];
+
+      for (let i = 0; i < longitudes.length; i++) {
+        for (let j = i + 1; j < longitudes.length; j++) {
+          const diff = mod(longitudes[j] - longitudes[i], 360);
+          const minDiff = Math.min(diff, 360 - diff);
+          for (const a of aspects) {
+            if (Math.abs(minDiff - a.angle) < a.orb) {
+              const x1 = cx + Math.cos(degToRad(longitudes[i]) - Math.PI/2) * radius;
+              const y1 = cy + Math.sin(degToRad(longitudes[i]) - Math.PI/2) * radius;
+              const x2 = cx + Math.cos(degToRad(longitudes[j]) - Math.PI/2) * radius;
+              const y2 = cy + Math.sin(degToRad(longitudes[j]) - Math.PI/2) * radius;
+              ctx.beginPath();
+              ctx.moveTo(x1, y1);
+              ctx.lineTo(x2, y2);
+              ctx.strokeStyle = a.color;
+              ctx.lineWidth = 2;
+              ctx.stroke();
+            }
+          }
+        }
+      }
+    }
+
+    // --- تلميحات البيوت ---
+    canvas.addEventListener('mousemove', function(e) {
+      const rect = canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left - cx;
+      const y = e.clientY - rect.top - cy;
+      const dist = Math.sqrt(x*x + y*y);
+      if (dist < radius && dist > 50) {
+        const angle = (Math.atan2(y, x) + Math.PI / 2 + 2 * Math.PI) % (2 * Math.PI);
+        const deg = radToDeg(angle);
+        const houseIndex = Math.floor(deg / 30);
+        const house = window.housesData[houseIndex];
+        if (house) {
+          tooltip.style.opacity = 1;
+          tooltip.style.left = `${e.clientX}px`;
+          tooltip.style.top = `${e.clientY - 10}px`;
+          tooltip.innerHTML = `
+            <strong>البيت ${house.num}</strong><br>
+            ${house.symbol} ${house.sign}<br>
+            ${t('start')}: ${house.start.toFixed(1)}°<br>
+            ${t('end')}: ${house.end.toFixed(1)}°
+          `;
+        }
+      } else {
+        tooltip.style.opacity = 0;
+      }
+    });
+
+    canvas.addEventListener('mouseout', () => {
+      tooltip.style.opacity = 0;
+    });
+
+    // --- حفظ وطباعة ---
+    function saveReport(type) {
+      const text = `تقرير فلكي\n${_('analysisContent').innerText}`;
+      if (type === 'txt') {
+        const blob = new Blob([text], { type: 'text/plain' });
+        saveBlob(blob, 'mawled-report.txt');
+      } else {
+        const pdf = `%PDF-1.4\n%تقرير فلكي\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n3 0 obj<</Type/Page/MediaBox[0 0 600 800]/Contents 4 0 R/Resources<</Font<</F1 5 0 R>>>>>>endobj\n4 0 obj<</Length 100>>stream\nBT /F1 12 Tf 50 750 Td (تقرير فلكي) Tj\nET\nendstream\nendobj\n5 0 obj<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>endobj\nxref 0 6\n0000000000 65535 f\n0000000010 00000 n\n0000000070 00000 n\n0000000120 00000 n\n0000000250 00000 n\n0000000400 00000 n\ntrailer<</Size 6/Root 1 0 R>>\nstartxref\n${text.length + 600}\n%%EOF`;
+        const blob = new Blob([pdf], { type: 'application/pdf' });
+        saveBlob(blob, 'mawled-report.pdf');
+      }
+    }
+
+    function saveBlob(blob, name) {
+      const link = document.createElement('a');
+      link.download = name;
+      link.href = URL.createObjectURL(blob);
+      link.click();
+    }
+
+    function printReport() {
+      const w = window.open();
+      w.document.write(`
+        <html><head><title>تقرير فلكي</title></head><body>
+          <h1>تقرير فلكي</h1>
+          <img src="${canvas.toDataURL()}" width="600"><br><br>
+          <h2>التحليل</h2>
+          ${_('analysisContent').innerHTML}
+        </body></html>
+      `);
+      w.document.close();
+      w.onload = () => w.print();
+    }
+
+    // --- التوليد ---
+    function generateChart() {
+      const dateStr = _('birthDate').value;
+      const timeStr = _('birthTime').value;
+      const lat = parseFloat(_('latitude').value);
+      const lon = parseFloat(_('longitude').value);
+
+      if (!dateStr || !timeStr || isNaN(lat) || isNaN(lon)) {
+        alert(currentLang === 'ar' ? 'املأ جميع الحقول' : 'Fill all fields');
+        return;
+      }
+
+      const dateTimeStr = `${dateStr}T${timeStr}`;
+      const birthDate = new Date(dateTimeStr);
+
+      if (isNaN(birthDate)) {
+        alert('تاريخ غير صحيح');
+        return;
+      }
+
+      const jd = julianDay(birthDate);
+      const lst = localSiderealTime(jd, lon);
+      asc = calculateAscendant(lst, lat);
+      mc = calculateMC(lst);
+      houses = equalHouses(asc);
+      const longitudes = planets.map(p => planetLong(p.eng, jd));
+
+      drawChart(asc, mc, longitudes, houses);
+
+      _('infoPanel').innerHTML = t('info')
+        .replace('{lst}', lst.toFixed(1))
+        .replace('{asc}', asc.toFixed(1))
+        .replace('{mc}', mc.toFixed(1));
+
+      // وحدة الكواكب
+      const legend = _('planetsLegend');
+      legend.innerHTML = '';
+      planets.forEach((p, i) => {
+        const sign = zodiac[Math.floor(longitudes[i] / 30)];
+        const house = Math.floor((longitudes[i] - asc + 360) % 360 / 30) + 1;
+        const div = document.createElement('div');
+        div.className = 'legend-item';
+        div.style.color = p.color;
+        div.innerHTML = `<span class="symbol">${p.symbol}</span> ${p.name} <small>(${t('house')} ${house})</small>`;
+        legend.appendChild(div);
+      });
+
+      // دليل الكواكب والأبراج
+      const planetsGuide = _('planetsGuide');
+      const signsGuide = _('signsGuide');
+      planetsGuide.innerHTML = '';
+      signsGuide.innerHTML = '';
+
+      planets.forEach(p => {
+        const div = document.createElement('div');
+        div.className = 'legend-row';
+        div.innerHTML = `<span class="symbol">${p.symbol}</span> ${p.name}`;
+        planetsGuide.appendChild(div);
+      });
+
+      zodiac.forEach(s => {
+        const div = document.createElement('div');
+        div.className = 'legend-row';
+        div.innerHTML = `<span class="symbol" style="color:${s.color}">${s.symbol}</span> ${s.name}`;
+        signsGuide.appendChild(div);
+      });
+    }
+
+    // --- تحميل وتلقائي ---
+    window.onload = function () {
+      updateLabels();
+      _('birthDate').value = '1969-02-20';
+      _('birthTime').value = '06:30';
+      generateChart();
+    };
+  </script>
+</body>
+</html>

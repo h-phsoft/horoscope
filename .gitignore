@@ -1,0 +1,38 @@
+# ملفات النظام
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# مجلدات IDE / محررات
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# ملفات النسخ الاحتياطي
+*~
+*.bak
+*.tmp
+*.log
+
+# مجلدات node_modules (إذا أضفت Node.js لاحقًا)
+node_modules/
+
+# مجلدات build مؤقتة
+/dist
+/build
+/out
+
+# ملفات البيئة
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# ملفات نظام التحكم بالإصدار الأخرى
+.svn/
+.hg/

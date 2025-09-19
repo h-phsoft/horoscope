@@ -1,0 +1,23 @@
+{
+  "name": "مُولد — المولد الفلكي",
+  "short_name": "مولد",
+  "description": "تطبيق فلكي دقيق بدون اتصال",
+  "start_url": "/horoscope/",
+  "scope": "/horoscope/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#121212",
+  "theme_color": "#0077b6",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
