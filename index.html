@@ -2,8 +2,20 @@
 <html lang="ar" dir="rtl">
 <head>
   <meta charset="UTF-8" />
-  <title>مُولد — المولد الفلكي</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>المولد الفلكي</title>
+
+  <!-- PWA Meta Tags -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0077b6">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="مولد فلكي">
+
+  <!-- روابط PWA -->
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <link rel="icon" type="image/png" href="icon-192.png">
+
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html, body {
@@ -146,8 +158,6 @@
       font-size: 12px;
       color: #888;
     }
-
-    /* جدول الكواكب والأبراج في عمودين */
     .legend-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -163,9 +173,47 @@
       align-items: center;
       gap: 8px;
     }
-    .legend-row .symbol {
-      font-size: 16px;
-      width: 20px;
+
+    /* Modal Style */
+    #analysisModal {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.85);
+      z-index: 1000;
+      justify-content: center;
+      align-items: center;
+    }
+    #analysisModalContent {
+      background: #1e1e1e;
+      color: #e0e0e0;
+      width: 90%;
+      max-width: 600px;
+      padding: 25px;
+      border-radius: 14px;
+      position: relative;
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+    #analysisModal h2 {
+      margin-bottom: 15px;
+      color: #00b4d8;
+    }
+    #closeModalBtn {
+      margin-top: 20px;
+      background: #0077b6;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+    #closeModalBtn:hover {
+      background: #005f86;
     }
   </style>
 </head>
@@ -185,7 +233,7 @@
     <div class="input-group">
       <label id="lblTime">الوقت (24 ساعة):</label>
       <input type="time" id="birthTime" step="1" />
-      <small class="hint">مثلاً: 06:30 صباحًا، 18:45 مساءً</small>
+      <small class="hint">مثلاً: 06:30 صباحًا</small>
     </div>
 
     <div class="input-group">
@@ -198,19 +246,12 @@
       <input type="number" id="longitude" step="0.0001" placeholder="31.2357" value="31.2357" />
     </div>
 
-    <div class="input-group">
-      <label id="lblHouse">نظام البيوت:</label>
-      <select id="houseSystem">
-        <option value="placidus">بلاسيدوس</option>
-        <option value="equal">متساوية</option>
-      </select>
-    </div>
-
-    <button id="btnGen"     onclick="generateChart()">إنشاء المخطط</button>
-    <button id="btnPrint"   class="btn-print" onclick="printReport()">🖨️ طباعة التقرير</button>
-    <button id="btnSave"    class="btn-save" onclick="saveReport('txt')">💾 حفظ كنص</button>
+    <button id="btnGen" onclick="generateChart()">إنشاء المخطط</button>
+    <button id="btnPrint" class="btn-print" onclick="printReport()">🖨️ طباعة التقرير</button>
+    <button id="btnSave" class="btn-save" onclick="saveReport('txt')">💾 حفظ كنص</button>
     <button id="btnSavePdf" class="btn-save" onclick="saveReport('pdf')">📄 حفظ كـ PDF</button>
-    <button id="btnLang"    class="btn-lang" onclick="toggleLang()">EN</button>
+    <button id="btnAnalysis" class="btn-lang" onclick="showPersonalityAnalysis()" style="display:none;">تحليل الشخصية</button>
+    <button id="btnLang" class="btn-lang" onclick="toggleLang()">EN</button>
 
     <h3>السحب والإفلات</h3>
     <div id="dropZone" class="drop-zone">
@@ -262,7 +303,16 @@
   </div>
 
   <div class="footer">
-    مولد فلكي دقيق — بدون مكتبات — نظام 24 ساعة
+    مولد فلكي دقيق - يمكن تثبيته على الهاتف - إصدار 1.25.9.2621
+  </div>
+
+  <!-- Modal تحليل الشخصية -->
+  <div id="analysisModal">
+    <div id="analysisModalContent">
+      <h2 id="modalTitle">تحليل الشخصية</h2>
+      <div id="personalityContent" style="line-height: 1.7;"></div>
+      <button id="closeModalBtn" onclick="closeModal()">إغلاق</button>
+    </div>
   </div>
 
   <script>
@@ -271,14 +321,12 @@
     const cx = canvas.width / 2;
     const cy = canvas.height / 2;
     const radius = 200;
-
     const tooltip = document.getElementById('tooltip');
 
     let currentLang = 'ar';
     let houses = [];
-    let asc = 0;
-    let mc = 0;
-    let zodiacStarts = [];
+    let asc = 0, mc = 0;
+    let sunLong = 0, moonLong = 0;
 
     const lang = {
       ar: {
@@ -287,22 +335,18 @@
         time: 'الوقت (24 ساعة):',
         lat: 'خط العرض:',
         lon: 'خط الطول:',
-        house: 'نظام البيوت:',
         btnGen: 'إنشاء المخطط',
         btnPrint: '🖨️ طباعة التقرير',
         btnSave: '💾 حفظ كنص',
         btnSavePdf: '📄 حفظ كـ PDF',
+        btnAnalysis: 'تحليل الشخصية',
         btnLang: 'EN',
         info: 'LST: {lst}° | الصاعد: {asc}° | MC: {mc}°',
         analysis: 'التحليل الفلكي',
-        planetIn: 'في',
         house: 'البيت',
-        aspects: 'جوانب',
-        noAspects: 'لا توجد جوانب قوية',
-        planet: 'الكوكب',
-        sign: 'البرج',
         start: 'بداية',
-        end: 'نهاية'
+        end: 'نهاية',
+        noAspects: 'لا توجد جوانب قوية'
       },
       en: {
         title: 'Mawled — Horoscope App',
@@ -310,22 +354,18 @@
         time: 'Time (24h):',
         lat: 'Latitude:',
         lon: 'Longitude:',
-        house: 'House System:',
         btnGen: 'Generate Chart',
         btnPrint: '🖨️ Print Report',
         btnSave: '💾 Save as Text',
         btnSavePdf: '📄 Save as PDF',
+        btnAnalysis: 'Personality Analysis',
         btnLang: 'AR',
         info: 'LST: {lst}° | Asc: {asc}° | MC: {mc}°',
         analysis: 'Astrological Analysis',
-        planetIn: 'in',
         house: 'House',
-        aspects: 'Aspects',
-        noAspects: 'No strong aspects',
-        planet: 'Planet',
-        sign: 'Sign',
         start: 'Start',
-        end: 'End'
+        end: 'End',
+        noAspects: 'No strong aspects'
       }
     };
 
@@ -345,13 +385,14 @@
       _('lblTime').textContent = t('time');
       _('lblLat').textContent = t('lat');
       _('lblLon').textContent = t('lon');
-      _('lblHouse').textContent = t('house');
       _('btnGen').textContent = t('btnGen');
       _('btnPrint').textContent = t('btnPrint');
       _('btnSave').textContent = t('btnSave');
       _('btnSavePdf').textContent = t('btnSavePdf');
+      _('btnAnalysis').textContent = t('btnAnalysis');
       _('btnLang').textContent = t('btnLang');
       _('analysisTitle').textContent = t('analysis');
+      _('modalTitle').textContent = t('btnAnalysis');
     }
 
     // --- السحب والإفلات ---
@@ -514,10 +555,8 @@
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.translate(0.5, 0.5);
 
-      // الدائرة الداخلية
       drawCircle(cx, cy, radius, '#0077b6');
 
-      // حفظ بيانات البيوت
       window.housesData = houses.map((start, i) => {
         const end = houses[(i + 1) % 12];
         const signIndex = Math.floor(start / 30);
@@ -525,7 +564,6 @@
         return { num: i + 1, start, end, sign: sign.name, symbol: sign.symbol };
       });
 
-      // رسم خطوط البيوت
       for (let i = 0; i < 12; i++) {
         const angle = degToRad(houses[i]) - Math.PI / 2;
         const x1 = cx + Math.cos(angle) * radius;
@@ -537,7 +575,6 @@
         ctx.stroke();
       }
 
-      // رموز الكواكب داخل الدائرة
       planets.forEach((p, i) => {
         const angle = degToRad(longitudes[i]) - Math.PI / 2;
         const x = cx + Math.cos(angle) * radius;
@@ -546,7 +583,6 @@
         writeText(p.symbol, x, y + 5, p.color, 16, 'Segoe UI Symbol');
       });
 
-      // أسماء الكواكب
       planets.forEach((p, i) => {
         const angle = degToRad(longitudes[i]) - Math.PI / 2;
         const x = cx + Math.cos(angle) * (radius + 30);
@@ -554,7 +590,6 @@
         writeText(p.name, x, y, p.color, 14);
       });
 
-      // رموز الأبراج
       for (let i = 0; i < 12; i++) {
         const deg = i * 30 + 15;
         const angle = degToRad(deg) - Math.PI / 2;
@@ -564,7 +599,6 @@
         writeText(sign.symbol, x, y, sign.color, 24, 'Segoe UI Symbol');
       }
 
-      // أسماء الأبراج
       for (let i = 0; i < 12; i++) {
         const deg = i * 30 + 15;
         const angle = degToRad(deg) - Math.PI / 2;
@@ -574,13 +608,11 @@
         writeText(sign.name, x, y, sign.color, 16);
       }
 
-      // الصاعد وMC
       const ascAngle = degToRad(asc) - Math.PI / 2;
       const mcAngle = degToRad(mc) - Math.PI / 2;
       writeText('↑', cx + Math.cos(ascAngle) * (radius + 20), cy + Math.sin(ascAngle) * (radius + 20), 'gold', 20);
       writeText('⊕', cx + Math.cos(mcAngle) * (radius + 20), cy + Math.sin(mcAngle) * (radius + 20), 'silver', 20);
 
-      // رسم الجوانب
       const aspects = [
         { name: 'اقتران', angle: 0, orb: 8, color: 'gold' },
         { name: 'سداسي', angle: 60, orb: 6, color: 'green' },
@@ -676,6 +708,114 @@
       w.onload = () => w.print();
     }
 
+    // --- تحليل الشخصية ---
+    function showPersonalityAnalysis() {
+      const sunSign = zodiac[Math.floor(sunLong / 30)];
+      const moonSign = zodiac[Math.floor(moonLong / 30)];
+      const ascSign = zodiac[Math.floor(asc / 30)];
+      const mcSign = zodiac[Math.floor(mc / 30)];
+
+      let analysis = `
+        <p><strong>الشمس في ${sunSign.name} (${sunSign.symbol})</strong>:<br>
+        ${getSunTrait(sunSign.name)}</p>
+        
+        <p><strong>القمر في ${moonSign.name} (${moonSign.symbol})</strong>:<br>
+        ${getMoonTrait(moonSign.name)}</p>
+        
+        <p><strong>الصاعد في ${ascSign.name} (${ascSign.symbol})</strong>:<br>
+        ${getAscTrait(ascSign.name)}</p>
+        
+        <p><strong>القمة العلوية (MC) في ${mcSign.name}</strong>:<br>
+        ${getMCTrait(mcSign.name)}</p>
+        
+        <p><strong>الخلاصة</strong>:<br>
+        ${getSummary(sunSign.name, moonSign.name, ascSign.name)}
+      `;
+
+      _('personalityContent').innerHTML = analysis;
+      _('analysisModal').style.display = 'flex';
+    }
+
+    function closeModal() {
+      _('analysisModal').style.display = 'none';
+    }
+
+    function getSunTrait(sign) {
+      const traits = {
+        'حمل': 'قيادي، شجاع، مبادر، لكن قد تكون متسرعًا.',
+        'ثور': 'مستقر، عملي، محب للجمال، لكن قد تكون عنيدًا.',
+        'جوزاء': 'ذكي، فضولي، اجتماعي، لكن قد تكون مشتتًا.',
+        'سرطان': 'عاطفي، حنون، وقائي، لكن قد تكون حساسًا جدًا.',
+        'أسد': 'واثق، كريم، محب للتمثيل، لكن قد تكون متعجرفًا.',
+        'عذراء': 'منظم، دقيق، خدمي، لكن قد تكون ناقدًا.',
+        'ميزان': 'دبلوماسي، عادل، يحب الجمال، لكن قد تكون مترددًا.',
+        'عقرب': 'عميق، قوي، سري، لكن قد تكون حاقدًا.',
+        'قوس': 'حُر، متفائل، فلسفي، لكن قد تكون غير مسؤول.',
+        'جدي': 'جاد، طموح، منضبط، لكن قد تكون باردًا عاطفيًا.',
+        'دلو': 'مبتكر، إنساني، مستقل، لكن قد تكون غير تقليدي جدًا.',
+        'حوت': 'حدسي، رحيم، فني، لكن قد تكون هاربًا من الواقع.'
+      };
+      return traits[sign] || 'تحليل غير متوفر.';
+    }
+
+    function getMoonTrait(sign) {
+      const traits = {
+        'حمل': 'تشعر بالحاجة للسيطرة، وردود أفعالك فورية.',
+        'ثور': 'تحتاج للاستقرار العاطفي، وتشعر بالأمان عبر الروتين.',
+        'جوزاء': 'عواطفك تتغير بسرعة، وتحتاج للتواصل المستمر.',
+        'سرطان': 'مشاعرك عميقة، وتحتاج لرعاية وحماية.',
+        'أسد': 'تشعر بالرضا عندما تُقدّر وتُحترم.',
+        'عذراء': 'عواطفك مرتبطة بالخدمة والمساعدة.',
+        'ميزان': 'تحتاج للتوازن العاطفي، وتخشى الصراع.',
+        'عقرب': 'مشاعرك قوية وسرية، وتشعر بالغيرة بسهولة.',
+        'قوس': 'عواطفك مرتبطة بالحرية والبحث عن المعنى.',
+        'جدي': 'تشعر بالأمان عبر المسؤولية والإنجاز.',
+        'دلو': 'عواطفك فريدة، وتحتاج لمساحة شخصية.',
+        'حوت': 'حدسك عاطفي قوي، وتميل للتعاطف مع الجميع.'
+      };
+      return traits[sign] || 'تحليل غير متوفر.';
+    }
+
+    function getAscTrait(sign) {
+      const traits = {
+        'حمل': 'تظهر كشخص نشيط، مباشر، وواثق.',
+        'ثور': 'تظهر كشخص هادئ، عملي، وموثوق.',
+        'جوزاء': 'تظهر كشخص ذكي، مرن، واجتماعي.',
+        'سرطان': 'تظهر كشخص حنون، حساس، ووَقائي.',
+        'أسد': 'تظهر كشخص كاريزمي، واثق، وقيادي.',
+        'عذراء': 'تظهر كشخص منظم، دقيق، ومهذب.',
+        'ميزان': 'تظهر كشخص دبلوماسي، أنيق، ومتوازن.',
+        'عقرب': 'تظهر كشخص غامض، قوي، وجذاب بصمت.',
+        'قوس': 'تظهر كشخص متفائل، حر، ومحب للمغامرة.',
+        'جدي': 'تظهر كشخص جاد، مسؤول، وواقعي.',
+        'دلو': 'تظهر كشخص فريد، مستقل، وغريب الأطوار.',
+        'حوت': 'تظهر كشخص حالم، لطيف، وغامض.'
+      };
+      return traits[sign] || 'تحليل غير متوفر.';
+    }
+
+    function getMCTrait(sign) {
+      const traits = {
+        'حمل': 'تسعى للريادة في مهنتك.',
+        'ثور': 'تريد استقرارًا ماليًا ووظيفيًا.',
+        'جوزاء': 'تنجح في المهن التي تتطلب تواصلًا.',
+        'سرطان': 'مهنتك مرتبطة بالرعاية أو العقارات.',
+        'أسد': 'تريد أن تكون مشهورًا أو قائدًا.',
+        'عذراء': 'تنجح في التفاصيل والتحليل.',
+        'ميزان': 'تنجح في القانون، الفن، أو الدبلوماسية.',
+        'عقرب': 'تنجح في التحقيقات، الطب، أو التحول.',
+        'قوس': 'مهنتك مرتبطة بالسفر أو التعليم.',
+        'جدي': 'طموحك مهني كبير، وتسعى للسلطة.',
+        'دلو': 'تنجح في الابتكار أو العمل الإنساني.',
+        'حوت': 'مهنتك مرتبطة بالفن، الروحانية، أو الخدمة.'
+      };
+      return traits[sign] || 'تحليل غير متوفر.';
+    }
+
+    function getSummary(sun, moon, asc) {
+      return `أنت شخصية ${sun} من الخارج، لكن داخلك ${moon}، وتظهر للعالم كـ ${asc}. هذا المزيج يجعلك فريدًا، قادرًا على الجمع بين العمق والعاطفة والطموح.`;
+    }
+
     // --- التوليد ---
     function generateChart() {
       const dateStr = _('birthDate').value;
@@ -703,6 +843,10 @@
       houses = equalHouses(asc);
       const longitudes = planets.map(p => planetLong(p.eng, jd));
 
+      // حفظ مواقع الشمس والقمر للتحليل
+      sunLong = longitudes[0];
+      moonLong = longitudes[1];
+
       drawChart(asc, mc, longitudes, houses);
 
       _('infoPanel').innerHTML = t('info')
@@ -710,7 +854,6 @@
         .replace('{asc}', asc.toFixed(1))
         .replace('{mc}', mc.toFixed(1));
 
-      // وحدة الكواكب
       const legend = _('planetsLegend');
       legend.innerHTML = '';
       planets.forEach((p, i) => {
@@ -723,7 +866,6 @@
         legend.appendChild(div);
       });
 
-      // دليل الكواكب والأبراج
       const planetsGuide = _('planetsGuide');
       const signsGuide = _('signsGuide');
       planetsGuide.innerHTML = '';
@@ -742,15 +884,29 @@
         div.innerHTML = `<span class="symbol" style="color:${s.color}">${s.symbol}</span> ${s.name}`;
         signsGuide.appendChild(div);
       });
+
+      // إظهار زر التحليل
+      _('btnAnalysis').style.display = 'block';
     }
 
-    // --- تحميل وتلقائي ---
+    // --- تحميل ---
     window.onload = function () {
       updateLabels();
       _('birthDate').value = '1969-02-20';
       _('birthTime').value = '06:30';
       generateChart();
     };
+  </script>
+
+  <!-- Service Worker -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('service-worker.js')
+          .then(reg => console.log('✅ SW مسجل:', reg.scope))
+          .catch(err => console.log('❌ فشل التسجيل:', err));
+      });
+    }
   </script>
 </body>
 </html>

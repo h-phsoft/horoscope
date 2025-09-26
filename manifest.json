@@ -1,7 +1,7 @@
 {
   "name": "مُولد — المولد الفلكي",
   "short_name": "مولد",
-  "description": "تطبيق فلكي دقيق بدون اتصال",
+  "description": "تطبيق فلكي دقيق مع تحليل شخصية — بدون اتصال",
   "start_url": "/horoscope/",
   "scope": "/horoscope/",
   "display": "standalone",

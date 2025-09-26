@@ -1,4 +1,4 @@
-const CACHE_NAME = 'horoscope-v1';
+const CACHE_NAME = 'horoscope-v2';
 const FILES_TO_CACHE = [
   '/horoscope/',
   '/horoscope/index.html',
@@ -32,7 +32,7 @@ self.addEventListener('activate', event => {
 
 self.addEventListener('fetch', event => {
   if (event.request.mode === 'navigate' || event.request.destination === 'document') {
-    event.respondWith(caches.match('/horoscope/index.html'));
+    event.respondWith(caches.match('/horoscope/index.html') || fetch(event.request));
   } else {
     event.respondWith(
       caches.match(event.request).then(response => {
